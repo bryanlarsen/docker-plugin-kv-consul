@@ -1,0 +1,48 @@
+{
+    "Config": {
+        "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "REDIS_VERSION=2.8.17",
+            "REDIS_DOWNLOAD_URL=http://download.redis.io/releases/redis-2.8.17.tar.gz",
+            "REDIS_DOWNLOAD_SHA1=913479f9d2a283bfaadd1444e17e7bab560e5d1e",
+            "KEY_foo=1",
+            "KEY_DEFAULT_bar=2",
+            "SERVICE_KEY_baz=3",
+            "SERVICE_KEY_DEFAULT_bat=4"
+        ],
+        "Hostname": "0b1b254c17c0",
+        "Image": "redis",
+        "Volumes": {
+            "/data": {}
+        }
+    },
+    "HostConfig": {
+        "VolumesFrom": null
+    },
+    "Id": "0b1b254c17c0986617a943ad626b0428b85b3b7c3a23d1e3c3f77dfaf45320f3",
+    "Image": "3ce54e911389a2b08207b0a4d01c3131ce01b617ecc1c248f6d81ffdbebd628d",
+    "MountLabel": "",
+    "Name": "/tender_euclid",
+    "NetworkSettings": {
+        "Bridge": "docker0",
+        "Gateway": "172.17.42.1",
+        "IPAddress": "172.17.0.7",
+        "IPPrefixLen": 16,
+        "MacAddress": "02:42:ac:11:00:07",
+        "PortMapping": null,
+        "Ports": {
+            "6379/tcp": [
+                {
+                    "HostIp": "0.0.0.0",
+                    "HostPort": "6379"
+                }
+            ]
+        }
+    },
+    "Volumes": {
+        "/data": "/var/lib/docker/vfs/dir/4688b2aedb4e963d8ae9498858cc2996d63413f9663736394853b263f520f1bb"
+    },
+    "VolumesRW": {
+        "/data": true
+    }
+}

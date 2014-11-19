@@ -1,13 +1,176 @@
 #!/bin/bash
 
-main() {
-    local container="$(cat)"
-    for i in $(seq 0 $(echo -n "$container" | jq -r '.Config.Env | length - 1')) ; do
-        local env_line = $(echo -n "$container" | jq -r ".Config.Env[$i]")
-        if [[ $env_line == CONSUL* ]] ; then
-            echo $env_line
+: ${CONSUL_IP:="127.0.0.1"}
+: ${CONSUL_PORT:="8500"}
+: ${CONSUL_URL:="http://${CONSUL_IP}:${CONSUL_PORT}/v1/kv/${CONSUL_PREFIX}"}
+
+# input: $(cat)
+# output as global variables:
+#   ports: array
+#   service_names: array
+#   service_ids: array
+#   out: associative array  key => value
+#   flags: associative array  key => consul flags
+setup() {
+    envs=( $(echo -n "$1" | jq -r ".Config.Env | .[]") )
+
+    unset env
+    declare -A -g env
+
+    for var in ${envs[*]} ; do
+        IFS='=' read -a env_split <<< "${var}"
+        env[${env_split[0]}]=${env_split[1]}
+    done
+
+    container_name=$(echo -n "$1" | jq -r ".Name")
+    container_name="${container_name##/}"
+
+    service_name=$(echo -n "$1" | jq -r ".Config.Image")
+    IFS='/' read -a name_split <<< "${service_name}"
+    if ! [ -z "${name_split[1]}" ] ; then service_name="${name_split[1]}"; fi
+
+    portps=( $(echo -n "$1" | jq -r ".NetworkSettings.Ports | keys | .[]") )
+    if [ ${#portps[*]} -lt 1 ] ; then
+        echo "no ports, bailing"
+        exit 0
+    fi
+
+    service_names=()
+    service_ids=()
+    ports=()
+
+    for i in `seq ${#portps[*]}` ; do
+        port=${portps[$i-1]}
+        IFS='/' read -a port_split <<< "${port}"
+        port="${port_split[0]}"
+        ports[$i-1]="${port_split[0]}"
+        protocol="${port_split[1]}"
+
+        if [ ${#portps[*]} -gt 1 ] ; then
+            if [ -z "${env[SERVICE_${port}_NAME]}" ] ; then
+                service_names[$i-1]="${service_name}-${port}"
+            else
+                service_names[$i-1]="${env[SERVICE_${port}_NAME]}"
+            fi
+        else
+            if [ -z "${env[SERVICE_NAME]}" ] ; then
+                service_names[$i-1]="${service_name}"
+            else
+                service_names[$i-1]="${env[SERVICE_NAME]}"
+            fi
+        fi
+
+        service_ids[$i-1]="$(hostname):${container_name}:${port}"
+        if [ "$protocol" = "udp" ] ; then service_ids[$i-1]="${service_ids[$i-1]}:udp"; fi
+
+        if [ ${#portps[*]} -gt 1 ] ; then
+            if ! [ -z "${env[SERVICE_${port}_ID]}" ] ; then
+                service_ids[$i-1]="${env[SERVICE_${port}_ID]}"
+            fi
+        else
+            if ! [ -z "${env[SERVICE_ID]}" ] ; then
+                service_ids[$i-1]="${env[SERVICE_ID]}"
+            fi
+        fi
+    done
+
+    unset out
+    declare -A -g out
+
+    unset flags
+    declare -A -g flags
+
+    for k in ${!env[@]} ; do
+        if [[ $k == KEY_DEFAULT_* ]] ; then
+            key="${k##KEY_DEFAULT_}"
+            out["$key"]=${env["$k"]}
+            flags["$key"]="?cas=0"
+        elif [[ $k == KEY_* ]] ; then
+            key="${k##KEY_}"
+            out["$key"]=${env["$k"]}
+        elif [[ $k == SERVICE_KEY_DEFAULT_* ]] ; then
+            key="${service_names[0]}/${service_ids[0]}/${k##SERVICE_KEY_DEFAULT_}"
+            out["$key"]=${env["$k"]}
+            flags["$key"]="?cas=0"
+        elif [[ $k == SERVICE_KEY_* ]] ; then
+            key="${service_names[0]}/${service_ids[0]}/${k##SERVICE_KEY_}"
+            out["$key"]=${env["$k"]}
+        elif [[ $k == SERVICE_* ]] ; then
+            for i in `seq ${#ports[@]}`; do
+                port=${ports[$i-1]}
+                if [[ $k == SERVICE_${port}_KEY_DEFAULT_* ]] ; then
+                    key="${service_names[$i-1]}/${service_ids[$i-1]}/${k##SERVICE_${port}_KEY_DEFAULT_}"
+                    out["$key"]=${env["$k"]}
+                    flags["$key"]="?cas=0"
+                elif [[ $k == SERVICE_${port}_KEY_* ]] ; then
+                    key="${service_names[$i-1]}/${service_ids[$i-1]}/${k##SERVICE_${port}_KEY_}"
+                    out["$key"]=${env["$k"]}
+                fi
+            done
         fi
     done
 }
 
-main
+process() {
+    for key in ${!out[@]} ; do
+        if ! curl -s -X PUT -d "${out[$key]}" "${CONSUL_URL}${key}${flags[$key]}" > /dev/null ; then
+            echo "cannot PUT to ${CONSUL_URL}${key}${flags[$key]}"
+        fi
+    done
+}
+
+do_test() {
+    set -e
+
+    setup "$(cat test_data/redis)"
+    [ ${#service_names[@]} -eq 1 ]
+    [ ${service_names[0]} = "redis" ]
+    [ ${service_ids[0]} = "$(hostname):tender_euclid:6379" ]
+
+    [ ${out[foo]} = "1" ]
+    [ -z ${flags[foo]} ]
+    [ ${out[bar]} = "2" ]
+    [ ${flags[bar]} = "?cas=0" ]
+    [ ${out["redis/$(hostname):tender_euclid:6379/baz"]} = "3" ]
+    [ -z ${flags["redis/$(hostname):tender_euclid:6379/baz"]} ]
+    [ ${out["redis/$(hostname):tender_euclid:6379/bat"]} = "4" ]
+    [ ${flags["redis/$(hostname):tender_euclid:6379/bat"]} = "?cas=0" ]
+    echo "1 pass"
+
+    setup "$(cat test_data/redis-multiple-ports)"
+    [ ${#service_names[@]} -eq 2 ]
+    [ ${service_names[0]} = "redis-6379" ]
+    [ ${service_ids[0]} = "$(hostname):tender_euclid:6379" ]
+    [ ${service_names[1]} = "redis-6779" ]
+    [ ${service_ids[1]} = "$(hostname):tender_euclid:6779:udp" ]
+    [ ${out["redis-6379/$(hostname):tender_euclid:6379/baz"]} = "3" ]
+    echo "2 pass"
+
+    setup "$(cat test_data/redis-explicit-name-id)"
+    [ ${#service_names[@]} -eq 1 ]
+    [ ${#service_ids[@]} -eq 1 ]
+    [ ${service_names[0]} = "myredis" ]
+    [ ${service_ids[0]} = "myredis-0" ]
+
+    [ ${out["myredis/myredis-0/baz"]} = "3" ]
+    [ ${out["myredis/myredis-0/bat"]} = "4" ]
+    [ ${flags["myredis/myredis-0/bat"]} = "?cas=0" ]
+    echo "3 pass"
+
+    setup "$(cat test_data/redis-explicit-multiple)"
+    [ ${#service_names[@]} -eq 2 ]
+    [ ${service_names[0]} = "myredis" ]
+    [ ${service_ids[0]} = "myredis-0" ]
+    [ ${service_names[1]} = "redis-6779" ]
+    [ ${service_ids[1]} = "$(hostname):tender_euclid:6779:udp" ]
+    [ ${out["myredis/myredis-0/baz"]} = "3" ]
+    echo "tests passed!"
+}
+
+if [ -v "$1" ] ; then
+    echo "running tests"
+    do_test
+else
+    setup $(cat)
+    process
+fi
