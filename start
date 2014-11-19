@@ -1,0 +1,13 @@
+#!/bin/bash
+
+main() {
+    local container="$(cat)"
+    for i in $(seq 0 $(echo -n "$container" | jq -r '.Config.Env | length - 1')) ; do
+        local env_line = $(echo -n "$container" | jq -r ".Config.Env[$i]")
+        if [[ $env_line == CONSUL* ]] ; then
+            echo $env_line
+        fi
+    done
+}
+
+main

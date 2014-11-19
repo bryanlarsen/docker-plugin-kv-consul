@@ -1,0 +1,11 @@
+[plugin]
+name = "docker-consulkv-plugin"
+description = "Set consul keys based on environment variables on container start"
+version = "0.1"
+maintainer_name = "Bryan Larsen"
+maintainer_email = "bryan@larsen.st"
+website_url = "http://github.com/bryanlarsen/docker-consulkv-plugin"
+
+[plugin.config]
+
+[plugin.compatibility]
