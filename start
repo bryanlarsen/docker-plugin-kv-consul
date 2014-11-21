@@ -164,10 +164,10 @@ do_test() {
     [ ${service_names[1]} = "redis-6779" ]
     [ ${service_ids[1]} = "$(hostname):tender_euclid:6779:udp" ]
     [ ${out["myredis/myredis-0/baz"]} = "3" ]
-    echo "tests passed!"
+    echo "all tests passed!"
 }
 
-if [ -v "$1" ] ; then
+if [ $# -eq 0 ] ; then
     echo "running tests"
     do_test
 else
