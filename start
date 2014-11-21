@@ -21,7 +21,9 @@ setup() {
 
     for var in ${envs[*]} ; do
         IFS='=' read -a env_split <<< "${var}"
-        env[${env_split[0]}]=${env_split[1]}
+        local combined="$(printf "=%s" "${env_split[@]:1}")"
+        combined="${combined:1}"
+        env[${env_split[0]}]="${combined}"
     done
 
     container_name=$(echo -n "$1" | jq -r ".Name")
@@ -126,8 +128,7 @@ do_test() {
     [ ${out["redis/$(hostname):tender_euclid:6379/bat"]} = "4" ]
     [ ${flags["redis/$(hostname):tender_euclid:6379/bat"]} = "?cas=0" ]
 
-
-    # FIME: patho = with=equals
+    [ ${out["patho"]} = "with=equals" ]
     echo "1 pass"
 
     setup "$(cat test_data/redis-multiple-ports)"
