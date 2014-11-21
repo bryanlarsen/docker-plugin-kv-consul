@@ -68,7 +68,7 @@ Sets a key called something like `myapp/hostname:excited_euclid:80/baz` to `4`. 
 
 As above, but only set the variable if they aren't already set.
 
-### SERVICE_NAME, SERVICE_<port>_NAME, SERVICE_ID, SERVICE_<port>_ID
+### `SERVICE_NAME`, `SERVICE_<port>_NAME`, `SERVICE_ID`, `SERVICE_<port>_ID`
 
 Sets service-id and service-name to more friendly values.  Used in a manner identical to that of [registrator](http://github.com/progrium/registrator).
 
