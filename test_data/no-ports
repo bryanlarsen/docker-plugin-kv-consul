@@ -1,0 +1,32 @@
+{
+    "Config": {
+        "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "KEY_foo=4",
+            "SERVICE_KEY_baz=7"
+        ],
+        "Hostname": "0b1b254c17c0",
+        "Image": "redis",
+        "Volumes": {
+            "/data": {}
+        }
+    },
+    "HostConfig": {
+        "VolumesFrom": null
+    },
+    "Id": "0b1b254c17c0986617a943ad626b0428b85b3b7c3a23d1e3c3f77dfaf45320f3",
+    "Image": "3ce54e911389a2b08207b0a4d01c3131ce01b617ecc1c248f6d81ffdbebd628d",
+    "MountLabel": "",
+    "Name": "/tender_euclid",
+    "NetworkSettings": {
+        "Bridge": "docker0",
+        "Gateway": "172.17.42.1",
+        "IPAddress": "172.17.0.7"
+    },
+    "Volumes": {
+        "/data": "/var/lib/docker/vfs/dir/4688b2aedb4e963d8ae9498858cc2996d63413f9663736394853b263f520f1bb"
+    },
+    "VolumesRW": {
+        "/data": true
+    }
+}

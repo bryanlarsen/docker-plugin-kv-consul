@@ -29,15 +29,19 @@ setup() {
     IFS='/' read -a name_split <<< "${service_name}"
     if ! [ -z "${name_split[1]}" ] ; then service_name="${name_split[1]}"; fi
 
-    portps=( $(echo -n "$1" | jq -r ".NetworkSettings.Ports | keys | .[]") )
-    if [ ${#portps[*]} -lt 1 ] ; then
-        echo "no ports, bailing"
-        exit 0
-    fi
+    portps=( $(echo -n "$1" | jq -r ".NetworkSettings.Ports | keys | .[]" 2> /dev/null) )
 
     service_names=()
     service_ids=()
     ports=()
+
+    if [ ${#portps[*]} -eq 0 ] ; then
+        service_names[0]="${service_name}"
+        if ! [ -z "${env[SERVICE_NAME]}" ] ; then service_names[0]="${env[SERVICE_NAME]}"; fi
+
+        service_ids[0]="$(hostname):${container_name}"
+        if ! [ -z "${env[SERVICE_ID]}" ] ; then service_ids[0]="${env[SERVICE_ID]}"; fi
+    fi
 
     for i in `seq ${#portps[*]}` ; do
         port=${portps[$i-1]}
@@ -46,32 +50,17 @@ setup() {
         ports[$i-1]="${port_split[0]}"
         protocol="${port_split[1]}"
 
-        if [ ${#portps[*]} -gt 1 ] ; then
-            if [ -z "${env[SERVICE_${port}_NAME]}" ] ; then
-                service_names[$i-1]="${service_name}-${port}"
-            else
-                service_names[$i-1]="${env[SERVICE_${port}_NAME]}"
-            fi
-        else
-            if [ -z "${env[SERVICE_NAME]}" ] ; then
-                service_names[$i-1]="${service_name}"
-            else
-                service_names[$i-1]="${env[SERVICE_NAME]}"
-            fi
-        fi
+        service_names[$i-1]="${service_name}"
+        if [ ${#portps[*]} -gt 1 ] ; then service_names[$i-1]="${service_name}-${port}"; fi
+
+        if ! [ -z "${env[SERVICE_NAME]}" ] ; then service_names[$i-1]="${env[SERVICE_NAME]}"; fi
+        if ! [ -z "${env[SERVICE_${port}_NAME]}" ] ; then service_names[$i-1]="${env[SERVICE_${port}_NAME]}"; fi
 
         service_ids[$i-1]="$(hostname):${container_name}:${port}"
         if [ "$protocol" = "udp" ] ; then service_ids[$i-1]="${service_ids[$i-1]}:udp"; fi
 
-        if [ ${#portps[*]} -gt 1 ] ; then
-            if ! [ -z "${env[SERVICE_${port}_ID]}" ] ; then
-                service_ids[$i-1]="${env[SERVICE_${port}_ID]}"
-            fi
-        else
-            if ! [ -z "${env[SERVICE_ID]}" ] ; then
-                service_ids[$i-1]="${env[SERVICE_ID]}"
-            fi
-        fi
+        if ! [ -z "${env[SERVICE_ID]}" ] ; then service_ids[$i-1]="${env[SERVICE_ID]}"; fi
+        if ! [ -z "${env[SERVICE_${port}_ID]}" ] ; then service_ids[$i-1]="${env[SERVICE_${port}_ID]}"; fi
     done
 
     unset out
@@ -164,6 +153,12 @@ do_test() {
     [ ${service_names[1]} = "redis-6779" ]
     [ ${service_ids[1]} = "$(hostname):tender_euclid:6779:udp" ]
     [ ${out["myredis/myredis-0/baz"]} = "3" ]
+    echo "4 pass"
+
+    setup "$(cat test_data/no-ports)"
+    [ ${#out[@]} -eq 2 ]
+    [ ${out[foo]} = "4" ]
+    [ ${out["redis/$(hostname):tender_euclid/baz"]} = "7" ]
     echo "all tests passed!"
 }
 
