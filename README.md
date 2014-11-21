@@ -21,7 +21,7 @@ or
        -e "KV_CONSUL_IP=172.17.0.35" \
        --hostname="$(hostname)" \
        -v /var/run/docker.sock:/var/run/docker.sock \
-       bryanlarsen/docker-consulkv-plugin
+       bryanlarsen/kv-consul
 
 ## Configuring
 
