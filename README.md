@@ -34,7 +34,7 @@ or
 
 To use this plugin, set environment variables on your containers.  They may be either set in your Dockerfile or set during `docker run`.
 
-### KEY\_
+### `KEY_`
 
 Prefix the environment variable with "KEY_" to unconditionally set a key.
 
@@ -42,7 +42,7 @@ Prefix the environment variable with "KEY_" to unconditionally set a key.
 
 Sets a key called `foo` to `1`.
 
-### KEY_DEFAULT\_
+### `KEY_DEFAULT_`
 
 Prefix the environment variable with "KEY_" to set a key only if it doesn't already exist in consul.
 
@@ -50,7 +50,7 @@ Prefix the environment variable with "KEY_" to set a key only if it doesn't alre
 
 Sets a key called `bar` to `2`, unless `bar` already has a value in Consul.
 
-### SERVICE_KEY\_
+### `SERVICE_KEY_`
 
 Prefix the environment variable with "SERVICE_KEY_" to set a key scoped to the service.
 
@@ -58,13 +58,13 @@ Prefix the environment variable with "SERVICE_KEY_" to set a key scoped to the s
 
 Sets a key called something like `myapp/hostname:excited_euclid:80/baz` to `4`.  The first two path components of the key are the `service-id` and `service-name` as defined by [registrator](http://github.com/progrium/registrator).   They can be overridden by setting `SERVICE_NAME` and `SERVICE_ID`
 
-### SERVICE_<port>_KEY\_
+### `SERVICE_<port>_KEY_`
 
 `SERVICE_KEY_` sets the key using the service-id of a random exposed port.   This is acceptable if you only have a single exposed port, but if you have more than one, use this form.
 
     docker run -e "SERVICE_80_KEY_bat=4" myapp
 
-### SERVICE_KEY_DEFAULT\_ or SERVICE_KEY_<port>_DEFAULT\_
+### `SERVICE_KEY_DEFAULT_` or `SERVICE_KEY_<port>_DEFAULT_`
 
 As above, but only set the variable if they aren't already set.
 
