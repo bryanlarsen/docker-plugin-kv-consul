@@ -8,6 +8,9 @@
             "KV_SET:foo=1",
             "KV_SET:bar?=2",
             "KV_SET:patho=with=equals",
+            "KV_SET:patho2=with space",
+            "KV_SET:patho3=with:colon",
+            "KV_SET:patho4=with=equals, space and:colon",
             "KV_SET:SERVICE:baz=3",
             "KV_SET:SERVICE:bat?=4"
         ],
