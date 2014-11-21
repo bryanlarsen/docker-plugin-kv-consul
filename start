@@ -1,14 +1,16 @@
 #!/bin/bash
 
-: ${CONSUL_IP:="127.0.0.1"}
-: ${CONSUL_PORT:="8500"}
-: ${CONSUL_URL:="http://${CONSUL_IP}:${CONSUL_PORT}/v1/kv/${CONSUL_PREFIX}"}
+set -eo pipefail
+
+: ${KV_CONSUL_IP:="127.0.0.1"}
+: ${KV_CONSUL_PORT:="8500"}
+: ${KV_CONSUL_URL:="http://${KV_CONSUL_IP}:${KV_CONSUL_PORT}/v1/kv/${KV_CONSUL_PREFIX}"}
 
 # input: $(cat)
 # output as global variables:
-#   ports: array
 #   service_names: array
 #   service_ids: array
+#   ports: associative array   port => index into service_ids
 #   out: associative array  key => value
 #   flags: associative array  key => consul flags
 setup() {
@@ -33,7 +35,9 @@ setup() {
 
     service_names=()
     service_ids=()
-    ports=()
+
+    unset ports
+    declare -A -g ports
 
     if [ ${#portps[*]} -eq 0 ] ; then
         service_names[0]="${service_name}"
@@ -47,7 +51,7 @@ setup() {
         port=${portps[$i-1]}
         IFS='/' read -a port_split <<< "${port}"
         port="${port_split[0]}"
-        ports[$i-1]="${port_split[0]}"
+        ports["${port_split[0]}"]=$((i - 1))
         protocol="${port_split[1]}"
 
         service_names[$i-1]="${service_name}"
@@ -70,40 +74,36 @@ setup() {
     declare -A -g flags
 
     for k in ${!env[@]} ; do
-        if [[ $k == KEY_DEFAULT_* ]] ; then
-            key="${k##KEY_DEFAULT_}"
-            out["$key"]=${env["$k"]}
-            flags["$key"]="?cas=0"
-        elif [[ $k == KEY_* ]] ; then
-            key="${k##KEY_}"
-            out["$key"]=${env["$k"]}
-        elif [[ $k == SERVICE_KEY_DEFAULT_* ]] ; then
-            key="${service_names[0]}/${service_ids[0]}/${k##SERVICE_KEY_DEFAULT_}"
-            out["$key"]=${env["$k"]}
-            flags["$key"]="?cas=0"
-        elif [[ $k == SERVICE_KEY_* ]] ; then
-            key="${service_names[0]}/${service_ids[0]}/${k##SERVICE_KEY_}"
-            out["$key"]=${env["$k"]}
-        elif [[ $k == SERVICE_* ]] ; then
-            for i in `seq ${#ports[@]}`; do
-                port=${ports[$i-1]}
-                if [[ $k == SERVICE_${port}_KEY_DEFAULT_* ]] ; then
-                    key="${service_names[$i-1]}/${service_ids[$i-1]}/${k##SERVICE_${port}_KEY_DEFAULT_}"
-                    out["$key"]=${env["$k"]}
-                    flags["$key"]="?cas=0"
-                elif [[ $k == SERVICE_${port}_KEY_* ]] ; then
-                    key="${service_names[$i-1]}/${service_ids[$i-1]}/${k##SERVICE_${port}_KEY_}"
-                    out["$key"]=${env["$k"]}
-                fi
-            done
+        local key_split=
+        IFS=':' read -a key_split <<< "$k"
+
+        local cmd="${key_split[0]}"
+        local key
+
+        if [[ ${#key_split[@]} == 3 && ${key_split[1]} == SERVICE ]] ; then
+            key="${service_names[0]}/${service_ids[0]}/${key_split[2]}"
+        elif [[ ${#key_split[@]} == 4 && ${key_split[1]} == SERVICE ]] ; then
+            local i="${ports[${key_split[2]}]}"
+            key="${service_names[$i]}/${service_ids[$i]}/${key_split[3]}"
+        elif [[ ${#key_split[@]} == 2 ]] ; then
+            key="${key_split[1]}"
+        fi
+
+        if [[ ( ! -z $key ) && $cmd == KV_SET ]] ; then
+            if [[ $key == *\? ]] ; then
+                out["${key%%\?}"]=${env["$k"]}
+                flags["${key%%?}"]="?cas=0"
+            else
+                out["$key"]=${env["$k"]}
+            fi
         fi
     done
 }
 
 process() {
     for key in ${!out[@]} ; do
-        if ! curl -s -X PUT -d "${out[$key]}" "${CONSUL_URL}${key}${flags[$key]}" > /dev/null ; then
-            echo "cannot PUT to ${CONSUL_URL}${key}${flags[$key]}"
+        if ! curl -s -X PUT -d "${out[$key]}" "${KV_CONSUL_URL}${key}${flags[$key]}" > /dev/null ; then
+            echo "cannot PUT to ${KV_CONSUL_URL}${key}${flags[$key]}"
         fi
     done
 }
@@ -120,10 +120,14 @@ do_test() {
     [ -z ${flags[foo]} ]
     [ ${out[bar]} = "2" ]
     [ ${flags[bar]} = "?cas=0" ]
+
     [ ${out["redis/$(hostname):tender_euclid:6379/baz"]} = "3" ]
     [ -z ${flags["redis/$(hostname):tender_euclid:6379/baz"]} ]
     [ ${out["redis/$(hostname):tender_euclid:6379/bat"]} = "4" ]
     [ ${flags["redis/$(hostname):tender_euclid:6379/bat"]} = "?cas=0" ]
+
+
+    # FIME: patho = with=equals
     echo "1 pass"
 
     setup "$(cat test_data/redis-multiple-ports)"

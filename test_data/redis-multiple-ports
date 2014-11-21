@@ -5,7 +5,7 @@
             "REDIS_VERSION=2.8.17",
             "REDIS_DOWNLOAD_URL=http://download.redis.io/releases/redis-2.8.17.tar.gz",
             "REDIS_DOWNLOAD_SHA1=913479f9d2a283bfaadd1444e17e7bab560e5d1e",
-            "SERVICE_6379_KEY_baz=3"
+            "KV_SET:SERVICE:baz=3"
         ],
         "Hostname": "0b1b254c17c0",
         "Image": "redis",

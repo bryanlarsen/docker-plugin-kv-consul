@@ -1,10 +1,10 @@
 [plugin]
-name = "docker-consulkv-plugin"
+name = "kv-consul"
 description = "Set arbitrary consul keys on container start"
 version = "0.1"
 maintainer_name = "Bryan Larsen"
 maintainer_email = "bryan@larsen.st"
-website_url = "http://github.com/bryanlarsen/docker-consulkv-plugin"
+website_url = "http://github.com/bryanlarsen/docker-plugin-kv-consul"
 
 [plugin.config]
 

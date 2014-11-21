@@ -2,8 +2,8 @@
     "Config": {
         "Env": [
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-            "KEY_foo=4",
-            "SERVICE_KEY_baz=7"
+            "KV_SET:foo=4",
+            "KV_SET:SERVICE:baz=7"
         ],
         "Hostname": "0b1b254c17c0",
         "Image": "redis",
