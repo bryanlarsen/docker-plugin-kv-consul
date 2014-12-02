@@ -10,13 +10,15 @@ set -eo pipefail
 # output as global variables:
 #   service_names: array
 #   service_ids: array
-#   ports: associative array   port => index into service_ids
+#   host_ports: array
+#   ports: associative array   port => index into above arrays
 #   out: associative array  key => value
 #   flags: associative array  key => consul flags
 setup() {
     unset env
     declare -A -g env
 
+    # populate ENV from $1
     while read var ; do
         IFS='=' read -a env_split <<< "${var}"
         local combined="$(printf "=%s" "${env_split[@]:1}")"
@@ -27,9 +29,12 @@ setup() {
     container_name=$(echo -n "$1" | jq -r ".Name")
     container_name="${container_name##/}"
 
-    service_name=$(echo -n "$1" | jq -r ".Config.Image")
-    IFS='/' read -a name_split <<< "${service_name}"
-    if ! [ -z "${name_split[1]}" ] ; then service_name="${name_split[1]}"; fi
+    container_id=$(echo -n "$1" | jq -r ".Id")
+    image_id=$(echo -n "$1" | jq -r ".Image")
+
+    image_name=$(echo -n "$1" | jq -r ".Config.Image")
+    if [[ $image_name =~ .*/(.*) ]] ; then image_name=${BASH_REMATCH[1]}; fi
+    if [[ $image_name =~ (.*):.* ]] ; then image_name=${BASH_REMATCH[1]}; fi
 
     portps=( $(echo -n "$1" | jq -r ".NetworkSettings.Ports | keys | .[]" 2> /dev/null) )
 
@@ -40,7 +45,7 @@ setup() {
     declare -A -g ports
 
     if [ ${#portps[*]} -eq 0 ] ; then
-        service_names[0]="${service_name}"
+        service_names[0]="${image_name}"
         if ! [ -z "${env[SERVICE_NAME]}" ] ; then service_names[0]="${env[SERVICE_NAME]}"; fi
 
         service_ids[0]="$(hostname):${container_name}"
@@ -48,14 +53,16 @@ setup() {
     fi
 
     for i in `seq ${#portps[*]}` ; do
-        port=${portps[$i-1]}
+        local port=${portps[$i-1]}
+        local host_port=$(echo -n "$1" | jq -r ".NetworkSettings.Ports[\"${port}\"][0].HostPort")
         IFS='/' read -a port_split <<< "${port}"
         port="${port_split[0]}"
         ports["${port_split[0]}"]=$((i - 1))
-        protocol="${port_split[1]}"
+        local protocol="${port_split[1]}"
 
-        service_names[$i-1]="${service_name}"
-        if [ ${#portps[*]} -gt 1 ] ; then service_names[$i-1]="${service_name}-${port}"; fi
+        host_ports[$i-1]="${host_port}"
+        service_names[$i-1]="${image_name}"
+        if [ ${#portps[*]} -gt 1 ] ; then service_names[$i-1]="${image_name}-${port}"; fi
 
         if ! [ -z "${env[SERVICE_NAME]}" ] ; then service_names[$i-1]="${env[SERVICE_NAME]}"; fi
         if ! [ -z "${env[SERVICE_${port}_NAME]}" ] ; then service_names[$i-1]="${env[SERVICE_${port}_NAME]}"; fi
@@ -67,6 +74,8 @@ setup() {
         if ! [ -z "${env[SERVICE_${port}_ID]}" ] ; then service_ids[$i-1]="${env[SERVICE_${port}_ID]}"; fi
     done
 
+    port_list=(${!ports[@]})
+
     unset out
     declare -A -g out
 
@@ -74,27 +83,48 @@ setup() {
     declare -A -g flags
 
     for k in ${!env[@]} ; do
-        local key_split
-        IFS=':' read -a key_split <<< "$k"
+        if [[ $k =~ ^KV_SET:(.+) ]] ; then
+            local key="${BASH_REMATCH[1]}"
+            local value="${env[$k]}"
 
-        local cmd="${key_split[0]}"
-        local key
+            local sed_args=(
+                -e "s/#<SERVICE_ID>#/${service_ids[0]}/g"
+                -e "s/#<SERVICE_NAME>#/${service_names[0]}/g"
+                -e "s/#<IMAGE_NAME>#/${image_name}/g"
+                -e "s/#<HOSTNAME>#/$(hostname)/g"
+                -e "s/#<CONTAINER_NAME>#/${container_name}/g"
+                -e "s/#<CONTAINER_ID>#/$(echo -n "$1" | jq -r ".Id")/g"
+                -e "s/#<IMAGE_ID>#/$(echo -n "$1" | jq -r ".Image")/g"
+                -e "s/#<IP_ADDRESS>#/$(echo -n "$1" | jq -r ".NetworkSettings.IPAddress")/g"
+                -e "s/#<HOST_PORT>#/${host_ports[0]}/g"
+            )
 
-        if [[ ${#key_split[@]} == 3 && ${key_split[1]} == SERVICE ]] ; then
-            key="${service_names[0]}/${service_ids[0]}/${key_split[2]}"
-        elif [[ ${#key_split[@]} == 4 && ${key_split[1]} == SERVICE ]] ; then
-            local i="${ports[${key_split[2]}]}"
-            key="${service_names[$i]}/${service_ids[$i]}/${key_split[3]}"
-        elif [[ ${#key_split[@]} == 2 ]] ; then
-            key="${key_split[1]}"
-        fi
+            for port in "${!ports[@]}" ; do
+                local i="${ports[$port]}"
+                sed_args=(
+                    "${sed_args[@]}"
+                    -e "s/#<SERVICE_${port}_ID>#/${service_ids[$i]}/g"
+                    -e "s/#<SERVICE_${port}_NAME>#/${service_names[$i]}/g"
+                    -e "s/#<HOST_${port}_PORT>#/${host_ports[$i]}/g"
+                )
+            done
 
-        if [[ ( ! -z $key ) && $cmd == KV_SET ]] ; then
+            for s in "${key}" "${value}" ; do
+                if echo "${s}" | grep -q "#jq<.*>#" ; then
+                    local expr=$(echo "${s}" | sed -e "s/#jq<\(.*\)>#/\1/")
+                    local match=$(echo -n "$1" | jq -r "${expr}")
+                    sed_args=("${sed_args[@]}" -e "s!#jq<.*>#!${match}!g")
+                fi
+            done
+
+            key=$(echo "${key}" | sed "${sed_args[@]}")
+            value=$(echo "${value}" | sed "${sed_args[@]}")
+
             if [[ $key == *\? ]] ; then
-                out["${key%%\?}"]=${env["$k"]}
+                out["${key%%\?}"]="${value}"
                 flags["${key%%?}"]="?cas=0"
             else
-                out["$key"]=${env["$k"]}
+                out["$key"]="${value}"
             fi
         fi
     done
@@ -126,10 +156,20 @@ do_test() {
     [ ${out["redis/$(hostname):tender_euclid:6379/bat"]} = "4" ]
     [ ${flags["redis/$(hostname):tender_euclid:6379/bat"]} = "?cas=0" ]
 
+    [ ${out["hostname"]} = "$(hostname)" ]
+    [ ${out["container_name"]} = "tender_euclid" ]
+    [ ${out["container_id"]} = "0b1b254c17c0986617a943ad626b0428b85b3b7c3a23d1e3c3f77dfaf45320f3" ]
+    [ ${out["image_id"]} = "3ce54e911389a2b08207b0a4d01c3131ce01b617ecc1c248f6d81ffdbebd628d" ]
+    [ ${out["ip"]} = "172.17.0.7" ]
+    [ ${out["port"]} = "16379" ]
+    [ ${out["port2"]} = "16379" ]
+
     [ ${out["patho"]} = "with=equals" ]
     [[ ${out["patho2"]} = "with space" ]]
     [ ${out["patho3"]} = "with:colon" ]
     [[ ${out["patho4"]} = "with=equals, space and:colon" ]]
+
+    [ ${out["public"]} = "/var/lib/docker/vfs/dir/4688b2aedb4e963d8ae9498858cc2996d63413f9663736394853b263f520f1bb" ]
     echo "1 pass"
 
     setup "$(cat test_data/redis-multiple-ports)"
@@ -138,7 +178,9 @@ do_test() {
     [ ${service_ids[0]} = "$(hostname):tender_euclid:6379" ]
     [ ${service_names[1]} = "redis-6779" ]
     [ ${service_ids[1]} = "$(hostname):tender_euclid:6779:udp" ]
+
     [ ${out["redis-6379/$(hostname):tender_euclid:6379/baz"]} = "3" ]
+    [ ${out["redis-6379-port"]} = "16379" ]
     echo "2 pass"
 
     setup "$(cat test_data/redis-explicit-name-id)"
@@ -150,6 +192,7 @@ do_test() {
     [ ${out["myredis/myredis-0/baz"]} = "3" ]
     [ ${out["myredis/myredis-0/bat"]} = "4" ]
     [ ${flags["myredis/myredis-0/bat"]} = "?cas=0" ]
+    [ ${out["image"]} = "redis" ]
     echo "3 pass"
 
     setup "$(cat test_data/redis-explicit-multiple)"
@@ -172,6 +215,9 @@ if [ $# -eq 0 ] ; then
     echo "running tests"
     do_test
 else
-    setup $(cat)
+    json=$(cat)
+    echo "JSON: ${json}"
+    echo -n "${json}" | jq .
+    setup "${json}"
     process
 fi

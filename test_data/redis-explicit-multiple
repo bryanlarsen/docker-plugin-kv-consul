@@ -7,7 +7,7 @@
             "REDIS_DOWNLOAD_SHA1=913479f9d2a283bfaadd1444e17e7bab560e5d1e",
             "SERVICE_6379_NAME=myredis",
             "SERVICE_6379_ID=myredis-0",
-            "KV_SET:SERVICE:6379:baz=3"
+            "KV_SET:#<SERVICE_6379_NAME>#/#<SERVICE_6379_ID>#/baz=3"
         ],
         "Hostname": "0b1b254c17c0",
         "Image": "redis",

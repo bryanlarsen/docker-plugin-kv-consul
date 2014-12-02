@@ -5,7 +5,8 @@
             "REDIS_VERSION=2.8.17",
             "REDIS_DOWNLOAD_URL=http://download.redis.io/releases/redis-2.8.17.tar.gz",
             "REDIS_DOWNLOAD_SHA1=913479f9d2a283bfaadd1444e17e7bab560e5d1e",
-            "KV_SET:SERVICE:baz=3"
+            "KV_SET:#<SERVICE_6379_NAME>#/#<SERVICE_6379_ID>#/baz=3",
+            "KV_SET:redis-6379-port=#<HOST_6379_PORT>#"
         ],
         "Hostname": "0b1b254c17c0",
         "Image": "redis",
@@ -31,7 +32,7 @@
             "6379/tcp": [
                 {
                     "HostIp": "0.0.0.0",
-                    "HostPort": "6379"
+                    "HostPort": "16379"
                 }
             ],
             "6779/udp": []

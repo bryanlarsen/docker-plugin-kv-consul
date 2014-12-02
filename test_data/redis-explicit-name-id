@@ -9,8 +9,9 @@
             "SERVICE_ID=myredis-0",
             "KV_SET:foo=1",
             "KV_SET:bar?=2",
-            "KV_SET:SERVICE:baz=3",
-            "KV_SET:SERVICE:bat?=4"
+            "KV_SET:#<SERVICE_NAME>#/#<SERVICE_ID>#/baz=3",
+            "KV_SET:#<SERVICE_NAME>#/#<SERVICE_ID>#/bat?=4",
+            "KV_SET:image=#<IMAGE_NAME>#"
         ],
         "Hostname": "0b1b254c17c0",
         "Image": "redis",

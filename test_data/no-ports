@@ -3,7 +3,7 @@
         "Env": [
             "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
             "KV_SET:foo=4",
-            "KV_SET:SERVICE:baz=7"
+            "KV_SET:#<SERVICE_NAME>#/#<SERVICE_ID>#/baz=7"
         ],
         "Hostname": "0b1b254c17c0",
         "Image": "redis",

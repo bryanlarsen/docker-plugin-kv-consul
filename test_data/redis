@@ -11,11 +11,19 @@
             "KV_SET:patho2=with space",
             "KV_SET:patho3=with:colon",
             "KV_SET:patho4=with=equals, space and:colon",
-            "KV_SET:SERVICE:baz=3",
-            "KV_SET:SERVICE:bat?=4"
+            "KV_SET:#<SERVICE_NAME>#/#<SERVICE_ID>#/baz=3",
+            "KV_SET:#<SERVICE_NAME>#/#<SERVICE_ID>#/bat?=4",
+            "KV_SET:hostname=#<HOSTNAME>#",
+            "KV_SET:container_name=#<CONTAINER_NAME>#",
+            "KV_SET:container_id=#<CONTAINER_ID>#",
+            "KV_SET:image_id=#<IMAGE_ID>#",
+            "KV_SET:ip=#<IP_ADDRESS>#",
+            "KV_SET:port=#<HOST_PORT>#",
+            "KV_SET:port2=#<HOST_6379_PORT>#",
+            "KV_SET:public=#jq< .Volumes[\"/data\"] >#"
         ],
         "Hostname": "0b1b254c17c0",
-        "Image": "redis",
+        "Image": "localhost:5000/org/redis:some_tag",
         "Volumes": {
             "/data": {}
         }
@@ -38,7 +46,7 @@
             "6379/tcp": [
                 {
                     "HostIp": "0.0.0.0",
-                    "HostPort": "6379"
+                    "HostPort": "16379"
                 }
             ]
         }
